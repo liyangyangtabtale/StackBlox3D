@@ -19,6 +19,7 @@ public class BlockController : MonoBehaviour
     private bool isActive = false;
     private List<BlockInfo> activeCells = new List<BlockInfo>(); // 当前下落方块的格子实例
     public static Action<int> updateScore;
+    public static Action<int> onLineClear; // 消除行时的事件
     private Queue<TetrominoType> nextQueue = new Queue<TetrominoType>();
     public static System.Action<List<TetrominoType>> updateNextQueue;
 
@@ -57,6 +58,9 @@ public class BlockController : MonoBehaviour
                         bonus = comboBonus[4] + (cleared - 4) * 4;
                     score += cleared * 1 + bonus;
                     updateScore?.Invoke(score);
+                    
+                    // 触发消除行UI提示
+                    onLineClear?.Invoke(cleared);
                 }
                 if (IsGameOver())
                 {
@@ -356,17 +360,22 @@ public static class CylindricalGridExtensions
             }
             grid.grid[layer, i] = 0;
         }
-        
+        // === 光圈特效 ===
+        if (grid.ringClearEffectPrefab != null)
+        {
+            float yPos = layer * grid.cellHeight;
+            GameObject fx = GameObject.Instantiate(grid.ringClearEffectPrefab, new Vector3(0, yPos, 0), Quaternion.identity);
+            fx.transform.SetParent(grid.transform, false);
+            fx.transform.localEulerAngles = new Vector3(90, 0, 0);
+        }
         // 上方整体下落
         for (int y = layer; y < grid.layerCount - 1; y++)
         for (int i = 0; i < grid.ringCount; i++)
         {
             grid.grid[y, i] = grid.grid[y + 1, i];
-            
             // 移动方块GameObject
             var currentCell = grid.cellObjects[y, i];
             var upperCell = grid.cellObjects[y + 1, i];
-            
             if (currentCell != null && upperCell != null)
             {
                 // 将上层方块的子对象移动到当前层
@@ -375,7 +384,6 @@ public static class CylindricalGridExtensions
                 {
                     children.Add(child);
                 }
-                
                 if (children.Count > 0)
                 {
                     foreach (var child in children)
@@ -387,7 +395,6 @@ public static class CylindricalGridExtensions
                 }
             }
         }
-        
         // 顶层清空
         for (int i = 0; i < grid.ringCount; i++)
         {

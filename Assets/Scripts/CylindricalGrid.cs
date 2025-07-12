@@ -13,7 +13,8 @@ public class CylindricalGrid : MonoBehaviour
     public float cellZ = 1f; 
     public GameObject cellPrefab; // 新增：格子预制体
     public Transform GridMeshsContent;
-    
+
+    public GameObject ringClearEffectPrefab;
     // 逻辑格子数据 0=空，1=有方块
     public int[,] grid;
     // 可视化格子
