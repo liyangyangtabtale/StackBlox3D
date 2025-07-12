@@ -38,10 +38,8 @@ public class CylinderRotator : MonoBehaviour
         // 平滑插值到目标角度
         if (!isDragging)
             currentAngle = Mathf.LerpAngle(currentAngle, targetAngle, Time.deltaTime * 10f);
-
-        // 应用旋转
-        if (grid != null)
-            grid.transform.localRotation = Quaternion.Euler(0, -currentAngle, 0);
+        
+        transform.localRotation = Quaternion.Euler(0, -currentAngle, 0);
     }
 
     // 获取当前环向偏移（0~ringCount-1）

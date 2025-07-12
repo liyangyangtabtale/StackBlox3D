@@ -61,6 +61,12 @@ public class BlockController : MonoBehaviour
                     
                     // 触发消除行UI提示
                     onLineClear?.Invoke(cleared);
+                    
+                    // 播放消除行音效
+                    if (AudioManager.Instance != null)
+                    {
+                        AudioManager.Instance.PlayLineClearSound();
+                    }
                 }
                 if (IsGameOver())
                 {
@@ -244,6 +250,12 @@ public class BlockController : MonoBehaviour
             }
         }
         activeCells.Clear();
+        
+        // 播放方块落地音效
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayBlockLandSound();
+        }
     }
     
     public bool IsGameOver()
