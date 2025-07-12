@@ -166,14 +166,12 @@ public class BlockController : MonoBehaviour
         return actualRing;
     }
 
-    bool TryMove(int dLayer, int dRing)
+    
+    bool TryMove(int dRing)
     {
-        int newLayer = currentTetromino.layer + dLayer;
-        int newRing = (currentTetromino.ring + dRing + grid.ringCount) % grid.ringCount;
-        if (CanPlace(newLayer, newRing, currentTetromino.rotation))
+        int newRing = GetActualRingForPlacement();
+        if (CanPlace(currentTetromino.layer, newRing,currentTetromino.rotation))
         {
-            currentTetromino.layer = newLayer;
-            currentTetromino.ring = newRing;
             return true;
         }
         return false;
@@ -182,7 +180,7 @@ public class BlockController : MonoBehaviour
     public bool TryRotate()
     {
         int newRot = (currentTetromino.rotation + 1) % 4;
-        if (CanPlace(currentTetromino.layer, currentTetromino.ring, newRot))
+        if (CanPlaceWithRotation(currentTetromino.layer, newRot))
         {
             currentTetromino.rotation = newRot;
             return true;
