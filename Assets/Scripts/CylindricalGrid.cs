@@ -19,6 +19,8 @@ public class CylindricalGrid : MonoBehaviour
     public int[,] grid;
     // 可视化格子
     public GameObject[,] cellObjects;
+    // 缓存GridCellInfo组件，避免重复GetComponent
+    private GridCellInfo[,] cellInfoCache;
     private bool gridGenerated = false;
     private List<GameObject> cellPool = new List<GameObject>();
 
@@ -26,6 +28,7 @@ public class CylindricalGrid : MonoBehaviour
     {
         grid = new int[layerCount, ringCount];
         cellObjects = new GameObject[layerCount, ringCount];
+        cellInfoCache = new GridCellInfo[layerCount, ringCount];
         StartCoroutine(GenerateGridMeshAsync());
     }
 
@@ -91,6 +94,7 @@ public class CylindricalGrid : MonoBehaviour
                 cellInfo.SetInfo(y, i, false);
 
                 cellObjects[y, i] = cell;
+                cellInfoCache[y, i] = cellInfo; // 缓存组件引用
 
                 count++;
                 if (count % batch == 0)
@@ -104,8 +108,8 @@ public class CylindricalGrid : MonoBehaviour
     {
         grid[layer, ring] = filled ? 1 : 0;
             
-        // 更新网格信息
-        var cellInfo = cellObjects[layer, ring].GetComponent<GridCellInfo>();
+        // 使用缓存的组件引用，避免GetComponent调用
+        var cellInfo = cellInfoCache[layer, ring];
         if (cellInfo != null)
         {
             cellInfo.SetOccupied(filled);
@@ -123,11 +127,11 @@ public class CylindricalGrid : MonoBehaviour
             if (cell != null)
             {
                 // 只清理子对象（方块），不销毁cell本身
-                var children = new List<Transform>();
-                foreach (Transform child in cell.transform)
-                    children.Add(child);
-                foreach (var child in children)
-                    GameObject.Destroy(child.gameObject);
+                int childCount = cell.transform.childCount;
+                for (int j = childCount - 1; j >= 0; j--)
+                {
+                    GameObject.Destroy(cell.transform.GetChild(j).gameObject);
+                }
             }
         }
     }

@@ -54,6 +54,15 @@ public class BlockController : MonoBehaviour
     [SerializeField] private TetrominoMaterialEntry[] materialEntries;
     public Dictionary<TetrominoType, Material[]> materials = new Dictionary<TetrominoType, Material[]>();
     
+    private bool positionUpdateNeeded = false;
+    
+    // 缓存队列List，避免频繁创建
+    private List<TetrominoType> cachedQueueList = new List<TetrominoType>();
+    
+    // 方块对象池
+    private Queue<BlockInfo> blockPool = new Queue<BlockInfo>();
+    private const int POOL_SIZE = 20; // 对象池大小
+    
     void Awake()
     {
         // 单例逻辑
@@ -68,6 +77,9 @@ public class BlockController : MonoBehaviour
             return;
         }
         
+        // 初始化对象池
+        InitializeBlockPool();
+        
         // 初始化队列
         nextQueue.Clear();
         int typeCount = System.Enum.GetValues(typeof(TetrominoType)).Length;
@@ -76,6 +88,52 @@ public class BlockController : MonoBehaviour
         foreach (var VARIABLE in materialEntries)
         {
             materials.Add(VARIABLE.blockType,VARIABLE.materials);
+        }
+    }
+
+    void InitializeBlockPool()
+    {
+        for (int i = 0; i < POOL_SIZE; i++)
+        {
+            var go = Instantiate(blockPrefab, transform);
+            go.SetActive(false);
+            var blockInfo = go.GetComponent<BlockInfo>();
+            if (blockInfo == null)
+            {
+                blockInfo = go.AddComponent<BlockInfo>();
+            }
+            blockPool.Enqueue(blockInfo);
+        }
+    }
+    
+    BlockInfo GetBlockFromPool()
+    {
+        if (blockPool.Count > 0)
+        {
+            var block = blockPool.Dequeue();
+            block.gameObject.SetActive(true);
+            return block;
+        }
+        else
+        {
+            // 池子空了，创建新的
+            var go = Instantiate(blockPrefab, transform);
+            var blockInfo = go.GetComponent<BlockInfo>();
+            if (blockInfo == null)
+            {
+                blockInfo = go.AddComponent<BlockInfo>();
+            }
+            return blockInfo;
+        }
+    }
+    
+    void ReturnBlockToPool(BlockInfo block)
+    {
+        if (block != null)
+        {
+            block.gameObject.SetActive(false);
+            block.transform.SetParent(transform);
+            blockPool.Enqueue(block);
         }
     }
 
@@ -99,6 +157,7 @@ public class BlockController : MonoBehaviour
             if (CanPlaceWithRotation(currentTetromino.layer - 1, currentTetromino.rotation))
             {
                 currentTetromino.layer -= 1;
+                positionUpdateNeeded = true; // 标记需要更新位置
             }
             else
             {
@@ -151,9 +210,11 @@ public class BlockController : MonoBehaviour
             }
         }
         
-        if (isActive && activeCells.Count > 0)
+        // 只在需要时更新位置
+        if (positionUpdateNeeded && isActive && activeCells.Count > 0)
         {
             UpdateActiveCellsPosition();
+            positionUpdateNeeded = false;
         }
     }
 
@@ -173,60 +234,74 @@ public class BlockController : MonoBehaviour
         isFastFalling = false;
         CreateActiveCells();
 
-        // 通知UI刷新
-        updateNextQueue?.Invoke(new List<TetrominoType>(nextQueue));
+        // 通知UI刷新 - 使用缓存的List
+        cachedQueueList.Clear();
+        cachedQueueList.AddRange(nextQueue);
+        updateNextQueue?.Invoke(cachedQueueList);
     }
 
     void CreateActiveCells()
     {
-        // 清理旧的
-        foreach (var go in activeCells)
-            Destroy(go);
+        // 先回收旧的到对象池
+        foreach (var blockInfo in activeCells)
+        {
+            ReturnBlockToPool(blockInfo);
+        }
         activeCells.Clear();
+        
         int[,] shape = currentTetromino.GetShape();
         for (int y = 0; y < 3; y++)
         for (int x = 0; x < 3; x++)
         {
             if (shape[y, x] == 0) continue;
-            var go = Instantiate(blockPrefab, transform);
             
-            // 添加方块信息脚本
-            var blockInfo = go.GetComponent<BlockInfo>();
-            if (blockInfo == null)
-            {
-                blockInfo = go.AddComponent<BlockInfo>();
-            }
+            // 从对象池获取方块
+            var blockInfo = GetBlockFromPool();
             blockInfo.SetInfo(currentTetromino.type, currentTetromino.rotation, 
                             currentTetromino.layer, currentTetromino.ring + x, true);
             
             activeCells.Add(blockInfo);
         }
-        UpdateActiveCellsPosition();
+        
+        // 标记需要更新位置
+        positionUpdateNeeded = true;
     }
 
     void UpdateActiveCellsPosition()
     {
+        if (currentTetromino == null) return;
+        
         int[,] shape = currentTetromino.GetShape();
         int idx = 0;
+        
+        // 预计算一些常用值
+        float angleStep = 360f / grid.ringCount;
+        float heightOffset = grid.cellHeight;
+        
         for (int y = 0; y < 3; y++)
         for (int x = 0; x < 3; x++)
         {
             if (shape[y, x] == 0) continue;
+            
             int gridLayer = currentTetromino.layer + y;
             int gridRing = (currentTetromino.ring + x) % grid.ringCount;
-            float angle = gridRing * 360f / grid.ringCount;
+            
+            // 优化角度计算
+            float angle = gridRing * angleStep;
             float rad = angle * Mathf.Deg2Rad;
             float px = Mathf.Cos(rad) * grid.radius;
             float pz = Mathf.Sin(rad) * grid.radius;
-            float py = gridLayer * grid.cellHeight - 0.5f;
-            var go = activeCells[idx++];
-            go.transform.position = new Vector3(px, py, pz);
-            go.transform.LookAt(new Vector3(0, py, 0), Vector3.up);
-            var blockInfo = go.GetComponent<BlockInfo>();
-            if (blockInfo != null)
-            {
-                blockInfo.SetPosition(gridLayer, gridRing);
-            }
+            float py = gridLayer * heightOffset - 0.5f;
+            
+            var blockInfo = activeCells[idx++];
+            var transform = blockInfo.transform;
+            
+            // 直接设置位置，避免创建新的Vector3
+            transform.position = new Vector3(px, py, pz);
+            transform.LookAt(new Vector3(0, py, 0), Vector3.up);
+            
+            // 直接调用BlockInfo的SetPosition，避免重复的GetComponent
+            blockInfo.SetPosition(gridLayer, gridRing);
         }
     }
     
@@ -261,6 +336,7 @@ public class BlockController : MonoBehaviour
         if (CanPlaceWithRotation(currentTetromino.layer, newRot))
         {
             currentTetromino.rotation = newRot;
+            positionUpdateNeeded = true; // 标记需要更新位置
             return true;
         }
         return false;
@@ -382,15 +458,14 @@ public class BlockController : MonoBehaviour
         // 清理当前下落的方块
         ClearCurrentTetromino();
         
-        // 清理BlockController Transform下的所有子对象
-        var children = new List<Transform>();
-        foreach (Transform child in transform)
+        // 清理BlockController Transform下的所有子对象 - 避免创建临时List
+        var transforms = transform.GetComponentsInChildren<Transform>();
+        for (int i = 1; i < transforms.Length; i++) // 跳过自身(index 0)
         {
-            children.Add(child);
-        }
-        foreach (var child in children)
-        {
-            Destroy(child.gameObject);
+            if (transforms[i] != transform)
+            {
+                Destroy(transforms[i].gameObject);
+            }
         }
     }
     
@@ -399,10 +474,7 @@ public class BlockController : MonoBehaviour
     {
         foreach (var blockInfo in activeCells)
         {
-            if (blockInfo != null)
-            {
-                Destroy(blockInfo.gameObject);
-            }
+            ReturnBlockToPool(blockInfo);
         }
         activeCells.Clear();
         currentTetromino = null;
@@ -413,10 +485,21 @@ public class BlockController : MonoBehaviour
         isFastFalling = fast;
     }
 
-    // 提供给UI获取队列
+    // 响应圆柱旋转
+    public void OnCylinderRotated()
+    {
+        if (isActive && activeCells.Count > 0)
+        {
+            positionUpdateNeeded = true;
+        }
+    }
+
+    // 提供给UI获取队列 - 使用缓存避免创建新List
     public List<TetrominoType> GetNextQueue()
     {
-        return new List<TetrominoType>(nextQueue);
+        cachedQueueList.Clear();
+        cachedQueueList.AddRange(nextQueue);
+        return cachedQueueList;
     }
 }
 
@@ -469,14 +552,16 @@ public static class CylindricalGridExtensions
                 int childCount = cellObj.transform.childCount;
                 if (childCount > 0)
                 {
-                    foreach (Transform child in cellObj.transform)
+                    // 从后往前删除，避免索引变化问题
+                    for (int j = childCount - 1; j >= 0; j--)
                     {
-                        MonoBehaviour.Destroy(child.gameObject);
+                        MonoBehaviour.Destroy(cellObj.transform.GetChild(j).gameObject);
                     }
                 }
             }
             grid.grid[layer, i] = 0;
         }
+        
         // === 光圈特效 ===
         if (grid.ringClearEffectPrefab != null)
         {
@@ -485,6 +570,7 @@ public static class CylindricalGridExtensions
             fx.transform.SetParent(grid.transform, false);
             fx.transform.localEulerAngles = new Vector3(-90, 0, 0);
         }
+        
         // 上方整体下落
         for (int y = layer; y < grid.layerCount - 1; y++)
         for (int i = 0; i < grid.ringCount; i++)
@@ -495,23 +581,18 @@ public static class CylindricalGridExtensions
             var upperCell = grid.cellObjects[y + 1, i];
             if (currentCell != null && upperCell != null)
             {
-                // 将上层方块的子对象移动到当前层
-                var children = new List<Transform>();
-                foreach (Transform child in upperCell.transform)
+                // 直接移动子对象，避免创建临时List
+                int childCount = upperCell.transform.childCount;
+                for (int j = childCount - 1; j >= 0; j--)
                 {
-                    children.Add(child);
-                }
-                if (children.Count > 0)
-                {
-                    foreach (var child in children)
-                    {
-                        child.SetParent(currentCell.transform);
-                        child.localPosition = Vector3.zero;
-                        child.localRotation = Quaternion.identity;
-                    }
+                    var child = upperCell.transform.GetChild(j);
+                    child.SetParent(currentCell.transform);
+                    child.localPosition = Vector3.zero;
+                    child.localRotation = Quaternion.identity;
                 }
             }
         }
+        
         // 顶层清空
         for (int i = 0; i < grid.ringCount; i++)
         {
@@ -520,9 +601,10 @@ public static class CylindricalGridExtensions
             if (topCell != null)
             {
                 // 销毁顶层所有方块
-                foreach (Transform child in topCell.transform)
+                int childCount = topCell.transform.childCount;
+                for (int j = childCount - 1; j >= 0; j--)
                 {
-                    MonoBehaviour.Destroy(child.gameObject);
+                    MonoBehaviour.Destroy(topCell.transform.GetChild(j).gameObject);
                 }
             }
         }

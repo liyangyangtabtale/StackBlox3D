@@ -9,10 +9,15 @@ public class CylinderRotator : MonoBehaviour
     private float targetAngle = 0f;
     private bool isDragging = false;
     private Vector2 lastTouchPos;
+    private float lastAngle = 0f; // 记录上一帧的角度
 
     void Update()
     {
         if (!canRotate) return;
+        
+        // 记录旋转前的角度
+        float previousAngle = currentAngle;
+        
         // 触摸滑动
         if (Input.GetMouseButtonDown(0))
         {
@@ -38,6 +43,15 @@ public class CylinderRotator : MonoBehaviour
         // 平滑插值到目标角度
         if (!isDragging)
             currentAngle = Mathf.LerpAngle(currentAngle, targetAngle, Time.deltaTime * 10f);
+        
+        // 如果角度发生变化，通知BlockController更新位置
+        if (Mathf.Abs(currentAngle - previousAngle) > 0.01f)
+        {
+            if (BlockController.Instance != null)
+            {
+                BlockController.Instance.OnCylinderRotated();
+            }
+        }
         
         transform.localRotation = Quaternion.Euler(0, -currentAngle, 0);
     }
