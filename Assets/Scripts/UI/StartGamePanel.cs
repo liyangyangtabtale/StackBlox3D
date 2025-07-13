@@ -4,7 +4,9 @@ using UnityEngine.UI;
 public class StartGamePanel : MonoBehaviour
 {
     public Button startButton;
-    
+
+    public Toggle MeshToggle;
+    public GameObject mesh;
     void Start()
     {
         if (startButton != null)
@@ -17,5 +19,10 @@ public class StartGamePanel : MonoBehaviour
     {
         UIManager.Instance.ShowGamingPanel();
         UIManager.Instance.blockController.StartGame();
+    }
+
+    public void SetMesh()
+    {
+        mesh.SetActive(MeshToggle.isOn);
     }
 } 

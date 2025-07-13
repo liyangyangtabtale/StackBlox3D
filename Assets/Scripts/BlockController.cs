@@ -4,8 +4,33 @@ using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
+[System.Serializable]
+public class TetrominoMaterialEntry
+{
+    public TetrominoType blockType;
+    public Material[] materials;
+}
+
 public class BlockController : MonoBehaviour
 {
+    private static BlockController instance;
+    public static BlockController Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<BlockController>();
+                if (instance == null)
+                {
+                    GameObject go = new GameObject("BlockController");
+                    instance = go.AddComponent<BlockController>();
+                }
+            }
+            return instance;
+        }
+    }
+    
     public CylindricalGrid grid;
     public CylinderRotator rotator;
     public float fallInterval = 1f;
@@ -14,6 +39,8 @@ public class BlockController : MonoBehaviour
     public int score = 0;
     public GameObject blockPrefab; // 俄罗斯方块单元格预制体
     public int ring;
+    [Header("方块生成设置")]
+    public int spawnHeightOffset = 3; // 方块生成高度偏移（游戏区域顶部往上几层）
     private Tetromino currentTetromino;
     private float fallTimer = 0f;
     private bool isActive = false;
@@ -22,14 +49,43 @@ public class BlockController : MonoBehaviour
     public static Action<int> onLineClear; // 消除行时的事件
     private Queue<TetrominoType> nextQueue = new Queue<TetrominoType>();
     public static System.Action<List<TetrominoType>> updateNextQueue;
-
+    
+    [Header("Material Configuration")]
+    [SerializeField] private TetrominoMaterialEntry[] materialEntries;
+    public Dictionary<TetrominoType, Material[]> materials = new Dictionary<TetrominoType, Material[]>();
+    
     void Awake()
     {
+        // 单例逻辑
+        if (instance == null)
+        {
+            instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else if (instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        
         // 初始化队列
         nextQueue.Clear();
         int typeCount = System.Enum.GetValues(typeof(TetrominoType)).Length;
         for (int i = 0; i < 2; i++)
             nextQueue.Enqueue((TetrominoType)Random.Range(0, typeCount));
+        foreach (var VARIABLE in materialEntries)
+        {
+            materials.Add(VARIABLE.blockType,VARIABLE.materials);
+        }
+    }
+
+    void OnDestroy()
+    {
+        // 清理单例引用
+        if (instance == this)
+        {
+            instance = null;
+        }
     }
 
     void Update()
@@ -50,13 +106,16 @@ public class BlockController : MonoBehaviour
                 int cleared = grid.CheckAndClearRings(out int chain);
                 if (cleared > 0)
                 {
-                    int[] comboBonus = {0, 0, 2, 4, 8};
-                    int bonus = 0;
-                    if (cleared < comboBonus.Length)
-                        bonus = comboBonus[cleared];
-                    else
-                        bonus = comboBonus[4] + (cleared - 4) * 4;
-                    score += cleared * 1 + bonus;
+                    // 新的消除行分数计算
+                    int clearScore = 0;
+                    if (cleared == 1)
+                        clearScore = 100;
+                    else if (cleared == 2)
+                        clearScore = 300;
+                    else if (cleared >= 3)
+                        clearScore = 600;
+                    
+                    score += clearScore;
                     updateScore?.Invoke(score);
                     
                     // 触发消除行UI提示
@@ -72,9 +131,18 @@ public class BlockController : MonoBehaviour
                 {
                     Debug.Log("Game Over! Final Score: " + score);
                     isActive = false;
+                    
+                    // 清理当前下落的方块
+                    ClearCurrentTetromino();
+                    
+                    // 播放游戏结束音效
+                    if (AudioManager.Instance != null)
+                    {
+                        AudioManager.Instance.PlayGameOverSound();
+                    }
+                    
                     if (UIManager.Instance != null)
                     {
-                        UIManager.Instance.ShowGameOver(score);
                         UIManager.Instance.ShowGameOver(score);
                     }
                     return;
@@ -97,7 +165,7 @@ public class BlockController : MonoBehaviour
         int typeCount = System.Enum.GetValues(typeof(TetrominoType)).Length;
         nextQueue.Enqueue((TetrominoType)Random.Range(0, typeCount));
         int rotation = 0;
-        int layer = grid.layerCount - 1;
+        int layer = grid.layerCount + spawnHeightOffset; // 从游戏区域顶部再往上指定层数开始生成 
         int ring = this.ring;
         currentTetromino = new Tetromino(type, rotation, layer, ring);
         isActive = true;
@@ -150,7 +218,7 @@ public class BlockController : MonoBehaviour
             float rad = angle * Mathf.Deg2Rad;
             float px = Mathf.Cos(rad) * grid.radius;
             float pz = Mathf.Sin(rad) * grid.radius;
-            float py = gridLayer * grid.cellHeight;
+            float py = gridLayer * grid.cellHeight - 0.5f;
             var go = activeCells[idx++];
             go.transform.position = new Vector3(px, py, pz);
             go.transform.LookAt(new Vector3(0, py, 0), Vector3.up);
@@ -207,7 +275,10 @@ public class BlockController : MonoBehaviour
             if (shape[y, x] == 0) continue;
             int gridLayer = layer + y - 1;
             int gridRing = (ring + x) % grid.ringCount;
-            if (gridLayer < 0 || gridLayer >= grid.layerCount) return false;
+            
+            // 只检查在游戏区域内的部分
+            if (gridLayer < 0) return false; // 低于游戏区域底部不允许
+            if (gridLayer >= grid.layerCount) continue; // 高于游戏区域顶部时跳过检查
             if (grid.grid[gridLayer, gridRing] != 0) return false;
         }
         return true;
@@ -226,6 +297,7 @@ public class BlockController : MonoBehaviour
         int[,] shape = currentTetromino.GetShape();
         int idx = 0;
         int actualRing = GetActualRingForPlacement();
+        
         for (int y = 0; y < 3; y++)
         for (int x = 0; x < 3; x++)
         {
@@ -251,6 +323,10 @@ public class BlockController : MonoBehaviour
         }
         activeCells.Clear();
         
+        // 方块放置得分：每放置一次得2分
+        score += 2;
+        updateScore?.Invoke(score);
+        
         // 播放方块落地音效
         if (AudioManager.Instance != null)
         {
@@ -270,6 +346,7 @@ public class BlockController : MonoBehaviour
     public void StartGame()
     {
         if (isActive) return; // 已经在游戏中则不重复开始
+        ClearAllBlocks(); // 清理所有方块和子对象
         score = 0;
         isActive = true;
         fallTimer = 0f;
@@ -283,6 +360,7 @@ public class BlockController : MonoBehaviour
 
     public void RestartGame()
     {
+        ClearAllBlocks(); // 清理所有方块和子对象
         score = 0;
         isActive = true;
         fallTimer = 0f;
@@ -293,6 +371,41 @@ public class BlockController : MonoBehaviour
         }
         SpawnNewTetromino();
         updateScore?.Invoke(score);
+    }
+    
+    // 清理BlockController中的所有方块和子对象
+    void ClearAllBlocks()
+    {
+        // 停止游戏逻辑
+        isActive = false;
+        
+        // 清理当前下落的方块
+        ClearCurrentTetromino();
+        
+        // 清理BlockController Transform下的所有子对象
+        var children = new List<Transform>();
+        foreach (Transform child in transform)
+        {
+            children.Add(child);
+        }
+        foreach (var child in children)
+        {
+            Destroy(child.gameObject);
+        }
+    }
+    
+    // 仅清理当前下落的方块
+    void ClearCurrentTetromino()
+    {
+        foreach (var blockInfo in activeCells)
+        {
+            if (blockInfo != null)
+            {
+                Destroy(blockInfo.gameObject);
+            }
+        }
+        activeCells.Clear();
+        currentTetromino = null;
     }
 
     public void SetFastFalling(bool fast)
@@ -340,14 +453,6 @@ public static class CylindricalGridExtensions
             }
         }
         
-        if (cleared > 0)
-        {
-            Debug.Log($"总共清除了{cleared}层，连锁数: {chain}");
-        }
-        else
-        {
-            Debug.Log("没有发现满环");
-        }
         return cleared;
     }
 
@@ -378,7 +483,7 @@ public static class CylindricalGridExtensions
             float yPos = layer * grid.cellHeight;
             GameObject fx = GameObject.Instantiate(grid.ringClearEffectPrefab, new Vector3(0, yPos, 0), Quaternion.identity);
             fx.transform.SetParent(grid.transform, false);
-            fx.transform.localEulerAngles = new Vector3(90, 0, 0);
+            fx.transform.localEulerAngles = new Vector3(-90, 0, 0);
         }
         // 上方整体下落
         for (int y = layer; y < grid.layerCount - 1; y++)

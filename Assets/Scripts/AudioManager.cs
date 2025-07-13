@@ -18,6 +18,7 @@ public class AudioManager : MonoBehaviour
     public AudioClip lineClearSound;
     public AudioClip gameOverSound;
     public AudioClip buttonClickSound;
+    public AudioClip downSpeedSound;
     public float sfxVolume = 0.7f;
     public bool enableSfx = true;
     
@@ -124,6 +125,11 @@ public class AudioManager : MonoBehaviour
     public void PlayButtonClickSound()
     {
         PlaySfx(buttonClickSound);
+    }
+    
+    public void PlayDownSpeed()
+    {
+        PlaySfx(downSpeedSound);
     }
     
     // 播放音效的通用方法

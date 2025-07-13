@@ -6,7 +6,7 @@ public class OverGamePanel : MonoBehaviour
 {
     public TextMeshProUGUI finalScoreText;
     public Button restartButton;
-
+    public ParticleSystem EndParticleSystem;
     void Start()
     {
         if (restartButton != null)
@@ -21,6 +21,7 @@ public class OverGamePanel : MonoBehaviour
         {
             finalScoreText.text = $"{score}";
         }
+        EndParticleSystem.Play();
     }
 
     void OnRestartClicked()

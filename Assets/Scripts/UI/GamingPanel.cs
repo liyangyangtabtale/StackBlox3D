@@ -70,6 +70,7 @@ public class GamingPanel : MonoBehaviour
         {
             blockController.SetFastFalling(true);
         }
+        AudioManager.Instance.PlayDownSpeed();
     }
 
     void OnFallButtonUp()

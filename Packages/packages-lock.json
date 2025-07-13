@@ -1,14 +1,5 @@
 {
   "dependencies": {
-    "com.justinpbarnett.unity-mcp": {
-      "version": "https://github.com/justinpbarnett/unity-mcp.git?path=/UnityMcpBridge",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.0.2"
-      },
-      "hash": "e67b806f5425b6877e2e0d5589ef9577d5730560"
-    },
     "com.unity.adaptiveperformance": {
       "version": "4.0.1",
       "depth": 1,
@@ -84,11 +75,13 @@
       },
       "url": "https://packages.unity.com"
     },
-    "com.unity.nuget.newtonsoft-json": {
-      "version": "3.2.1",
-      "depth": 1,
+    "com.unity.postprocessing": {
+      "version": "3.4.0",
+      "depth": 0,
       "source": "registry",
-      "dependencies": {},
+      "dependencies": {
+        "com.unity.modules.physics": "1.0.0"
+      },
       "url": "https://packages.unity.com"
     },
     "com.unity.profiling.core": {

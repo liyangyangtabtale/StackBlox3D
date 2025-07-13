@@ -13,6 +13,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _ALPHAPREMULTIPLY_ON
+  - _EMISSION
   m_InvalidKeywords:
   - _BUMPMAP
   - _COLOROVERLAY_ON
@@ -36,7 +37,7 @@ Material:
   - _TERRAIN_BLEND_HEIGHT
   - _TERRAIN_NORMAL_MAP
   - _WETNESS
-  m_LightmapFlags: 4
+  m_LightmapFlags: 2
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: 3000
@@ -87,15 +88,25 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _texcoord:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _BumpScale: 1
     - _Cutoff: 0.5
+    - _DepthRange: 6.66
     - _DetailNormalMapScale: 1
     - _DstBlend: 10
+    - _EdgeContrast: 1.25
+    - _EdgeGain: 2.38
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 1
+    - _GridSize: 1.68
+    - _GridTile: 1.26
+    - _Intensity: 0.57
     - _Metallic: 0
     - _Mode: 3
     - _OcclusionStrength: 1
@@ -105,9 +116,10 @@ Material:
     - _SrcBlend: 1
     - _UVSec: 0
     - _ZWrite: 0
+    - __dirty: 1
     m_Colors:
-    - _Color: {r: 0.4528302, g: 0.4528302, b: 0.4528302, a: 0.3764706}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 0}
+    - _EmissionColor: {r: 0.2264151, g: 0.2264151, b: 0.2264151, a: 1}
   m_BuildTextureStacks: []
 --- !u!114 &11400000
 MonoBehaviour:
