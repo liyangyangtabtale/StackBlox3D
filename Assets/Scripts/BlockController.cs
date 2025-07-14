@@ -43,12 +43,19 @@ public class BlockController : MonoBehaviour
     public int spawnHeightOffset = 3; // 方块生成高度偏移（游戏区域顶部往上几层）
     private Tetromino currentTetromino;
     private float fallTimer = 0f;
-    private bool isActive = false;
+    private bool _isActive = false;
     private List<BlockInfo> activeCells = new List<BlockInfo>(); // 当前下落方块的格子实例
     public static Action<int> updateScore;
     public static Action<int> onLineClear; // 消除行时的事件
     private Queue<TetrominoType> nextQueue = new Queue<TetrominoType>();
     public static System.Action<List<TetrominoType>> updateNextQueue;
+    
+    // 公开isActive属性，供CylinderRotator访问
+    public bool isActive 
+    { 
+        get { return _isActive; } 
+        private set { _isActive = value; } 
+    }
     
     [Header("Material Configuration")]
     [SerializeField] private TetrominoMaterialEntry[] materialEntries;
@@ -500,6 +507,33 @@ public class BlockController : MonoBehaviour
         cachedQueueList.Clear();
         cachedQueueList.AddRange(nextQueue);
         return cachedQueueList;
+    }
+
+    // 公开获取当前方块的方法
+    public Tetromino GetCurrentTetromino()
+    {
+        return currentTetromino;
+    }
+
+    // 公开碰撞检测方法，供CylinderRotator使用
+    public bool CanPlaceAt(int layer, int ring, int rotation)
+    {
+        if (currentTetromino == null) return true;
+        
+        int[,] shape = TetrominoData.Shapes[currentTetromino.type][rotation];
+        for (int y = 0; y < 3; y++)
+        for (int x = 0; x < 3; x++)
+        {
+            if (shape[y, x] == 0) continue;
+            int gridLayer = layer + y - 1;
+            int gridRing = (ring + x) % grid.ringCount;
+            
+            // 只检查在游戏区域内的部分
+            if (gridLayer < 0) return false; // 低于游戏区域底部不允许
+            if (gridLayer >= grid.layerCount) continue; // 高于游戏区域顶部时跳过检查
+            if (grid.grid[gridLayer, gridRing] != 0) return false;
+        }
+        return true;
     }
 }
 
