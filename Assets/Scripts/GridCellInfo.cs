@@ -6,7 +6,6 @@ public class GridCellInfo : MonoBehaviour
     public int layerIndex;
     public int ringIndex;
     public bool isOccupied = false;
-    public TetrominoType type;
     public void SetInfo(int layer, int ring, bool occupied)
     {
         layerIndex = layer;
