@@ -326,17 +326,6 @@ public class BlockController : MonoBehaviour
         return actualRing;
     }
 
-    
-    bool TryMove(int dRing)
-    {
-        int newRing = GetActualRingForPlacement();
-        if (CanPlace(currentTetromino.layer, newRing,currentTetromino.rotation))
-        {
-            return true;
-        }
-        return false;
-    }
-
     public bool TryRotate()
     {
         int newRot = (currentTetromino.rotation + 1) % 4;
@@ -349,7 +338,7 @@ public class BlockController : MonoBehaviour
         return false;
     }
 
-    bool CanPlace(int layer, int ring, int rotation)
+    public bool CanPlace(int layer, int ring, int rotation)
     {
         int[,] shape = TetrominoData.Shapes[currentTetromino.type][rotation];
         for (int y = 0; y < 3; y++)
@@ -513,27 +502,6 @@ public class BlockController : MonoBehaviour
     public Tetromino GetCurrentTetromino()
     {
         return currentTetromino;
-    }
-
-    // 公开碰撞检测方法，供CylinderRotator使用
-    public bool CanPlaceAt(int layer, int ring, int rotation)
-    {
-        if (currentTetromino == null) return true;
-        
-        int[,] shape = TetrominoData.Shapes[currentTetromino.type][rotation];
-        for (int y = 0; y < 3; y++)
-        for (int x = 0; x < 3; x++)
-        {
-            if (shape[y, x] == 0) continue;
-            int gridLayer = layer + y - 1;
-            int gridRing = (ring + x) % grid.ringCount;
-            
-            // 只检查在游戏区域内的部分
-            if (gridLayer < 0) return false; // 低于游戏区域底部不允许
-            if (gridLayer >= grid.layerCount) continue; // 高于游戏区域顶部时跳过检查
-            if (grid.grid[gridLayer, gridRing] != 0) return false;
-        }
-        return true;
     }
 }
 

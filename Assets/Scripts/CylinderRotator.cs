@@ -105,7 +105,7 @@ public class CylinderRotator : MonoBehaviour
         if (actualRing < 0) actualRing += grid.ringCount;
         
         // 检测在新位置是否会发生碰撞
-        return BlockController.Instance.CanPlaceAt(currentTetromino.layer, actualRing, currentTetromino.rotation);
+        return BlockController.Instance.CanPlace(currentTetromino.layer, actualRing, currentTetromino.rotation);
     }
 
     // 获取当前环向偏移（0~ringCount-1）
