@@ -511,32 +511,117 @@ public static class CylindricalGridExtensions
         int cleared = 0;
         chain = 0;
         
+        // 先找出所有需要清除的行，记录原始位置
+        List<int> layersToRemove = new List<int>();
+        
         for (int y = 0; y < grid.layerCount; y++)
         {
             bool full = true;
-            int filledCount = 0;
             for (int i = 0; i < grid.ringCount; i++)
             {
                 if (grid.grid[y, i] == 0)
                 {
                     full = false;
-                }
-                else
-                {
-                    filledCount++;
+                    break;
                 }
             }
             
             if (full)
             {
-                grid.ClearRing(y);
-                cleared++;
-                chain++;
-                y--; // 检查新下落的这一层
+                layersToRemove.Add(y);
             }
         }
         
+        // 如果没有需要清除的行，直接返回
+        if (layersToRemove.Count == 0)
+        {
+            return 0;
+        }
+        
+        // 先为每个原始位置生成特效
+        foreach (int layer in layersToRemove)
+        {
+            if (grid.ringClearEffectPrefab != null)
+            {
+                float yPos = layer * grid.cellHeight;
+                GameObject fx = GameObject.Instantiate(grid.ringClearEffectPrefab, grid.transform);
+                fx.transform.localEulerAngles = new Vector3(-90, 0, 0);
+                fx.transform.localPosition = new Vector3(0, yPos, 0);
+            }
+        }
+        
+        // 从底部开始清除行（不包括特效生成）
+        for (int i = 0; i < layersToRemove.Count; i++)
+        {
+            int layerToRemove = layersToRemove[i] - i; // 考虑之前已经清除的行数
+            grid.ClearRingWithoutEffect(layerToRemove);
+            cleared++;
+            chain++;
+        }
+        
         return cleared;
+    }
+
+    // 清除指定层并整体下落（不生成特效）
+    public static void ClearRingWithoutEffect(this CylindricalGrid grid, int layer)
+    {
+        // 销毁被清除层的所有方块GameObject
+        for (int i = 0; i < grid.ringCount; i++)
+        {
+            var cellObj = grid.cellObjects[layer, i];
+            if (cellObj != null)
+            {
+                // 销毁所有子对象（方块）
+                int childCount = cellObj.transform.childCount;
+                if (childCount > 0)
+                {
+                    // 从后往前删除，避免索引变化问题
+                    for (int j = childCount - 1; j >= 0; j--)
+                    {
+                        MonoBehaviour.Destroy(cellObj.transform.GetChild(j).gameObject);
+                    }
+                }
+            }
+            grid.grid[layer, i] = 0;
+        }
+        
+        // 上方整体下落
+        for (int y = layer; y < grid.layerCount - 1; y++)
+        for (int i = 0; i < grid.ringCount; i++)
+        {
+            grid.grid[y, i] = grid.grid[y + 1, i];
+            // 移动方块GameObject
+            var currentCell = grid.cellObjects[y, i];
+            var upperCell = grid.cellObjects[y + 1, i];
+            if (currentCell != null && upperCell != null)
+            {
+                // 直接移动子对象，避免创建临时List
+                int childCount = upperCell.transform.childCount;
+                for (int j = childCount - 1; j >= 0; j--)
+                {
+                    var child = upperCell.transform.GetChild(j);
+                    child.SetParent(currentCell.transform);
+                    child.localPosition = Vector3.zero;
+                    child.localRotation = Quaternion.identity;
+                }
+            }
+        }
+        
+        // 顶层清空
+        for (int i = 0; i < grid.ringCount; i++)
+        {
+            grid.grid[grid.layerCount - 1, i] = 0;
+            var topCell = grid.cellObjects[grid.layerCount - 1, i];
+            if (topCell != null)
+            {
+                // 销毁顶层所有方块
+                int childCount = topCell.transform.childCount;
+                for (int j = childCount - 1; j >= 0; j--)
+                {
+                    MonoBehaviour.Destroy(topCell.transform.GetChild(j).gameObject);
+                }
+            }
+        }
     }
 
     // 清除指定层并整体下落
@@ -566,9 +651,9 @@ public static class CylindricalGridExtensions
         if (grid.ringClearEffectPrefab != null)
         {
             float yPos = layer * grid.cellHeight;
-            GameObject fx = GameObject.Instantiate(grid.ringClearEffectPrefab, new Vector3(0, yPos, 0), Quaternion.identity);
-            fx.transform.SetParent(grid.transform, false);
+            GameObject fx = GameObject.Instantiate(grid.ringClearEffectPrefab, grid.transform);
             fx.transform.localEulerAngles = new Vector3(-90, 0, 0);
+            fx.transform.localPosition = new Vector3(0, yPos, 0);
         }
         
         // 上方整体下落
